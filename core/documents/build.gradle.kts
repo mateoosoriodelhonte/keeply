@@ -6,7 +6,9 @@ description = "Safe import of untrusted receipts: type sniffing, content-address
 
 dependencies {
     api(project(":core:domain"))
-    implementation(libs.pdfbox)
+    api(libs.pdfbox)
     implementation(libs.coroutines.core)
     implementation(libs.slf4j.api)
+
+    testImplementation(project(":fixtures"))
 }
