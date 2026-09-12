@@ -65,8 +65,10 @@ public data class CaptureConditions(
  */
 public object ReceiptImageRenderer {
 
-    private const val FONT_SIZE = 22
-    private const val PADDING = 48
+    // Sized so a rendered receipt is roughly the resolution of a phone photograph
+    // of one. Smaller renders would flatter OCR in tests and mislead about accuracy.
+    private const val FONT_SIZE = 30
+    private const val PADDING = 60
     private const val LINE_SPACING = 1.28
 
     public fun render(spec: ReceiptSpec, conditions: CaptureConditions = CaptureConditions.CLEAN): BufferedImage =
