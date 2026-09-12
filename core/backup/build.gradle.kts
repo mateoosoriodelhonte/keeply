@@ -8,8 +8,10 @@ description = "Portable backup archives plus CSV/JSON export. Hardened against m
 dependencies {
     api(project(":core:domain"))
     api(project(":core:data"))
-    implementation(project(":core:documents"))
+    api(project(":core:documents"))
     implementation(libs.serialization.json)
     implementation(libs.coroutines.core)
     implementation(libs.slf4j.api)
+
+    testImplementation(project(":fixtures"))
 }
