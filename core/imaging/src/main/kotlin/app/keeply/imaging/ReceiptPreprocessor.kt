@@ -18,12 +18,25 @@ public enum class PreprocessStep {
     THRESHOLD,
 }
 
-/** What to do to a photograph before reading it. */
+/**
+ * What to do to a photograph before reading it.
+ *
+ * The defaults are what measurement supports, not what receipt-OCR advice
+ * usually recommends. Running the full chain against the synthetic corpus showed
+ * that binarising the image ourselves makes Tesseract markedly worse: a
+ * photographed receipt scored 0.97 as plain greyscale and 0.50 after adaptive
+ * thresholding. Tesseract binarises internally and does it better than a fixed
+ * block size can. Local contrast equalisation and denoising measured neutral.
+ *
+ * Perspective correction is the step that earns its place, taking a photographed
+ * receipt from 0.97 to 0.99. See `PreprocessingAblationTest` and
+ * `docs/OCR_PIPELINE.md`.
+ */
 public data class PreprocessOptions(
     val correctPerspective: Boolean = true,
-    val enhanceContrast: Boolean = true,
-    val denoise: Boolean = true,
-    val threshold: Boolean = true,
+    val enhanceContrast: Boolean = false,
+    val denoise: Boolean = false,
+    val threshold: Boolean = false,
     /**
      * Tesseract wants characters around 30 pixels tall. Small photos are enlarged
      * to roughly this width before reading, which measurably helps on till receipts.
@@ -35,13 +48,29 @@ public data class PreprocessOptions(
     public companion object {
         public val DEFAULT: PreprocessOptions = PreprocessOptions()
 
-        /** Leaves the image alone. Used to compare against, and for clean scans. */
+        /** Leaves the image alone apart from greyscale. Used to compare against. */
         public val NONE: PreprocessOptions = PreprocessOptions(
             correctPerspective = false,
             enhanceContrast = false,
             denoise = false,
             threshold = false,
             targetWidth = 0,
+        )
+
+        /**
+         * Everything on, for a person retrying a photo that came out badly.
+         *
+         * This measured *worse* than the defaults on Keeply's corpus, which is
+         * clean synthetic paper. It is offered because a genuinely dark or unevenly
+         * lit photograph of a crumpled receipt is not that, and because a retry
+         * button that changes nothing is worse than one that changes something.
+         * It is never applied automatically.
+         */
+        public val AGGRESSIVE: PreprocessOptions = PreprocessOptions(
+            correctPerspective = true,
+            enhanceContrast = true,
+            denoise = true,
+            threshold = true,
         )
     }
 }

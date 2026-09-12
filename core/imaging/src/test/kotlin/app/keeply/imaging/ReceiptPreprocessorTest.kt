@@ -14,11 +14,12 @@ import kotlin.test.assertTrue
 class ReceiptPreprocessorTest {
     private val generator = ReceiptGenerator(seed = 314)
     private val preprocessor = ReceiptPreprocessor()
-    private val clean = ReceiptImageRenderer.render(generator.spec(layout = ReceiptLayout.CLASSIC_TILL))
+    private val spec = generator.spec(layout = ReceiptLayout.CLASSIC_TILL)
+    private val clean = ReceiptImageRenderer.render(spec)
 
     @Test
     fun findsThePaperInAPhotographTakenAtAnAngle() {
-        val photograph = Distortions.photographAtAnAngle(clean)
+        val photograph = ReceiptImageRenderer.render(spec, CaptureConditions.PHOTOGRAPHED)
         val outline = assertNotNull(
             DocumentEdgeDetector.detect(photograph),
             "the sheet of paper should be findable against a dark surface",
@@ -38,7 +39,7 @@ class ReceiptPreprocessorTest {
 
     @Test
     fun flattensAPhotographedPageIntoARectangle() {
-        val photograph = Distortions.photographAtAnAngle(clean)
+        val photograph = ReceiptImageRenderer.render(spec, CaptureConditions.PHOTOGRAPHED)
         val outline = assertNotNull(DocumentEdgeDetector.detect(photograph))
         val corrected = preprocessor.correctPerspective(photograph, outline)
 
@@ -54,7 +55,7 @@ class ReceiptPreprocessorTest {
 
     @Test
     fun reportsEveryStepItApplied() {
-        val result = preprocessor.prepare(clean)
+        val result = preprocessor.prepare(clean, PreprocessOptions.AGGRESSIVE)
         assertTrue(PreprocessStep.GREYSCALE in result.steps)
         assertTrue(PreprocessStep.CONTRAST in result.steps)
         assertTrue(PreprocessStep.THRESHOLD in result.steps)
@@ -62,8 +63,17 @@ class ReceiptPreprocessorTest {
     }
 
     @Test
+    fun leavesBinarisationToTesseractByDefault() {
+        // Measured, not assumed: doing it here scored 0.50 against 0.97 for plain
+        // greyscale on a photographed receipt. See PreprocessingAblationTest.
+        val result = preprocessor.prepare(clean)
+        assertTrue(PreprocessStep.THRESHOLD !in result.steps)
+        assertTrue(PreprocessStep.CONTRAST !in result.steps)
+    }
+
+    @Test
     fun correctsPerspectiveWhenItFindsAPageAndSaysSo() {
-        val photograph = Distortions.photographAtAnAngle(clean)
+        val photograph = ReceiptImageRenderer.render(spec, CaptureConditions.PHOTOGRAPHED)
         val result = preprocessor.prepare(photograph)
         assertTrue(result.documentFound)
         assertTrue(PreprocessStep.PERSPECTIVE_CORRECTION in result.steps)
@@ -81,7 +91,7 @@ class ReceiptPreprocessorTest {
 
     @Test
     fun honoursACropThePersonAdjustedByHand() {
-        val photograph = Distortions.photographAtAnAngle(clean)
+        val photograph = ReceiptImageRenderer.render(spec, CaptureConditions.PHOTOGRAPHED)
         val manual = Quadrilateral(
             Point2(50.0, 50.0),
             Point2(photograph.width - 50.0, 60.0),
@@ -110,7 +120,10 @@ class ReceiptPreprocessorTest {
     @Test
     fun producesAnImageWithInkAndPaperRatherThanMush() {
         val faded = ReceiptImageRenderer.render(generator.spec(), CaptureConditions.FADED)
-        val result = preprocessor.prepare(faded, PreprocessOptions(correctPerspective = false))
+        val result = preprocessor.prepare(
+            faded,
+            PreprocessOptions.AGGRESSIVE.copy(correctPerspective = false),
+        )
 
         var dark = 0
         var light = 0

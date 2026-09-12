@@ -17,6 +17,8 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.slf4j.api)
 
+    testImplementation(project(":fixtures"))
+
     nativePlatforms.forEach { platform ->
         runtimeOnly(variantOf(libs.tesseract) { classifier(platform) })
         runtimeOnly(variantOf(libs.leptonica) { classifier(platform) })
