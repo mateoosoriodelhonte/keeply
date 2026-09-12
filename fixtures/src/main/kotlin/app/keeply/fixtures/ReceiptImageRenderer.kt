@@ -38,6 +38,14 @@ public data class CaptureConditions(
     val noise: Double = 0.0,
     /** Pixels of desk visible around the paper, as when photographing a receipt. */
     val surroundMargin: Int = 0,
+    /**
+     * How far from directly overhead the camera was, 0.0 to about 0.35.
+     *
+     * A receipt photographed from an angle has converging edges, which rotation
+     * alone does not reproduce. This is the distortion the preprocessor's
+     * perspective correction exists to undo.
+     */
+    val perspective: Double = 0.0,
     val surroundColour: Color = Color(64, 62, 58),
     val seed: Long = 1L,
 ) {
@@ -45,9 +53,18 @@ public data class CaptureConditions(
         /** A flatbed scan: what a receipt looks like at its best. */
         public val CLEAN: CaptureConditions = CaptureConditions()
 
-        /** A phone photo on a desk, slightly askew. */
-        public val PHOTOGRAPHED: CaptureConditions =
-            CaptureConditions(rotationDegrees = 4.5, surroundMargin = 90, blurRadius = 1, noise = 0.01)
+        /** A phone photo taken over a desk: askew, at an angle, on a visible surface. */
+        public val PHOTOGRAPHED: CaptureConditions = CaptureConditions(
+            rotationDegrees = 3.0,
+            surroundMargin = 90,
+            perspective = 0.16,
+            blurRadius = 1,
+            noise = 0.01,
+        )
+
+        /** Straight on, but skewed on the desk. */
+        public val SKEWED: CaptureConditions =
+            CaptureConditions(rotationDegrees = 6.0, surroundMargin = 70)
 
         /** Thermal paper that has spent a month in a wallet. */
         public val FADED: CaptureConditions = CaptureConditions(inkFade = 0.55)
@@ -100,6 +117,9 @@ public object ReceiptImageRenderer {
             dispose()
         }
 
+        if (conditions.perspective > 0.0) {
+            image = photographAtAnAngle(image, conditions)
+        }
         if (conditions.surroundMargin > 0 || abs(conditions.rotationDegrees) > 0.0) {
             image = placeOnSurface(image, conditions)
         }
@@ -131,6 +151,23 @@ public object ReceiptImageRenderer {
         }
         ImageIO.write(rgb, "jpg", out)
         out.toByteArray()
+    }
+
+    /** Tilts the page away from the camera, so its edges converge. */
+    private fun photographAtAnAngle(paper: BufferedImage, conditions: CaptureConditions): BufferedImage {
+        val inset = paper.width * conditions.perspective
+        return PerspectiveWarp.apply(
+            source = paper,
+            destination = listOf(
+                doubleArrayOf(inset, 0.0),
+                doubleArrayOf(paper.width - 1.0, inset * 0.35),
+                doubleArrayOf(paper.width - 1.0 - inset * 0.55, paper.height - 1.0),
+                doubleArrayOf(0.0, paper.height - 1.0 - inset * 0.45),
+            ),
+            canvasWidth = paper.width,
+            canvasHeight = paper.height,
+            background = conditions.surroundColour,
+        )
     }
 
     /** Puts the paper on a desk and turns it a little, as a phone photo would. */
