@@ -1,0 +1,35 @@
+-- Categories a person sorts purchases by. Keeply ships a starter set because an
+-- empty list is a chore, not a feature; all of them can be renamed or added to.
+
+CREATE TABLE category (
+    id                       TEXT    NOT NULL PRIMARY KEY,
+    name                     TEXT    NOT NULL,
+    icon                     TEXT    NOT NULL,
+    is_built_in              INTEGER NOT NULL DEFAULT 0,
+    sort_order               INTEGER NOT NULL DEFAULT 0,
+    -- 'MONTHS', 'DAYS', 'LIFETIME' or NULL. Only ever offered as a suggestion.
+    suggested_warranty_kind  TEXT,
+    suggested_warranty_value INTEGER
+);
+
+selectAll:
+SELECT * FROM category ORDER BY sort_order, name COLLATE NOCASE;
+
+selectById:
+SELECT * FROM category WHERE id = ?;
+
+upsert:
+INSERT INTO category(id, name, icon, is_built_in, sort_order, suggested_warranty_kind, suggested_warranty_value)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    icon = excluded.icon,
+    sort_order = excluded.sort_order,
+    suggested_warranty_kind = excluded.suggested_warranty_kind,
+    suggested_warranty_value = excluded.suggested_warranty_value;
+
+deleteById:
+DELETE FROM category WHERE id = ? AND is_built_in = 0;
+
+countAll:
+SELECT count(*) FROM category;

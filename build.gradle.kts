@@ -22,10 +22,12 @@ tasks.register("keeplyVersion") {
 val privacyGuard = tasks.register<app.keeply.buildlogic.PrivacyGuardTask>("privacyGuard") {
     group = "verification"
     description = "Fails if Keeply gains network or analytics access outside :core:ai."
+    // Rooted at each module's source directory rather than at the module itself, so
+    // the task never has a build output folder inside its inputs.
     sources.from(
-        fileTree("core") { include("**/src/main/kotlin/**/*.kt") },
-        fileTree("desktop") { include("**/src/main/kotlin/**/*.kt") },
-        fileTree("fixtures") { include("**/src/main/kotlin/**/*.kt") },
+        subprojects.map { module ->
+            fileTree(module.projectDir.resolve("src/main/kotlin")) { include("**/*.kt") }
+        },
     )
     // The Ollama integration is opt-in, off by default, and talks only to localhost.
     allowedPaths.set(setOf("core/ai/src/"))

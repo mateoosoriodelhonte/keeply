@@ -1,0 +1,75 @@
+-- Files Keeply has taken responsibility for. The original bytes are never
+-- modified; anything derived from them lives in document_text and can be rebuilt.
+
+CREATE TABLE document (
+    id                 TEXT    NOT NULL PRIMARY KEY,
+    kind               TEXT    NOT NULL,
+    format             TEXT    NOT NULL,
+    -- Always relative to the Keeply data directory, always a generated name.
+    relative_path      TEXT    NOT NULL,
+    byte_size          INTEGER NOT NULL,
+    sha256             TEXT    NOT NULL,
+    imported_at        INTEGER NOT NULL,
+    original_file_name TEXT,
+    page_count         INTEGER
+);
+
+CREATE INDEX document_sha256 ON document(sha256);
+CREATE INDEX document_kind ON document(kind);
+
+-- Text Keeply derived from a document, kept strictly apart from the document
+-- itself. Re-running OCR replaces this row and never touches the original.
+CREATE TABLE document_text (
+    document_id     TEXT    NOT NULL PRIMARY KEY REFERENCES document(id) ON DELETE CASCADE,
+    text            TEXT    NOT NULL,
+    source          TEXT    NOT NULL,
+    mean_confidence REAL,
+    extracted_at    INTEGER NOT NULL,
+    engine          TEXT    NOT NULL,
+    duration_millis INTEGER NOT NULL
+);
+
+selectById:
+SELECT * FROM document WHERE id = ?;
+
+selectBySha256:
+SELECT * FROM document WHERE sha256 = ?;
+
+selectAll:
+SELECT * FROM document ORDER BY imported_at DESC;
+
+selectByKind:
+SELECT * FROM document WHERE kind = ? ORDER BY imported_at DESC;
+
+insert:
+INSERT INTO document(id, kind, format, relative_path, byte_size, sha256, imported_at, original_file_name, page_count)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM document WHERE id = ?;
+
+totalBytesByKind:
+SELECT kind, sum(byte_size) AS total_bytes, count(*) AS file_count
+FROM document GROUP BY kind;
+
+countAll:
+SELECT count(*) FROM document;
+
+-- Derived text
+
+textFor:
+SELECT * FROM document_text WHERE document_id = ?;
+
+upsertText:
+INSERT INTO document_text(document_id, text, source, mean_confidence, extracted_at, engine, duration_millis)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(document_id) DO UPDATE SET
+    text = excluded.text,
+    source = excluded.source,
+    mean_confidence = excluded.mean_confidence,
+    extracted_at = excluded.extracted_at,
+    engine = excluded.engine,
+    duration_millis = excluded.duration_millis;
+
+deleteText:
+DELETE FROM document_text WHERE document_id = ?;

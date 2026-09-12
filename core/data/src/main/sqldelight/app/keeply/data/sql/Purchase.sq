@@ -1,0 +1,216 @@
+-- A thing the person bought. Fields Keeply could not establish are NULL rather
+-- than blank or zero, so nothing invented can pass for something read.
+
+CREATE TABLE purchase (
+    id                   TEXT    NOT NULL PRIMARY KEY,
+    product_name         TEXT    NOT NULL,
+    merchant_id          TEXT    REFERENCES merchant(id) ON DELETE SET NULL,
+    -- Kept alongside merchant_id so a purchase still reads correctly if the
+    -- merchant record is deleted.
+    merchant_name        TEXT,
+    purchase_date        TEXT,
+    price_minor          INTEGER,
+    price_currency       TEXT,
+    tax_minor            INTEGER,
+    category_id          TEXT    REFERENCES category(id) ON DELETE SET NULL,
+    receipt_document_id  TEXT    REFERENCES document(id) ON DELETE SET NULL,
+    receipt_number       TEXT,
+
+    return_policy_kind   TEXT    NOT NULL DEFAULT 'UNKNOWN',
+    return_policy_days   INTEGER,
+    return_policy_until  TEXT,
+    return_source        TEXT    NOT NULL DEFAULT 'NONE',
+    return_deadline      TEXT,
+
+    warranty_term_kind   TEXT    NOT NULL DEFAULT 'UNKNOWN',
+    warranty_term_value  INTEGER,
+    warranty_term_until  TEXT,
+    warranty_provenance  TEXT    NOT NULL DEFAULT 'SUGGESTED',
+    warranty_start       TEXT,
+    warranty_end         TEXT,
+    warranty_notes       TEXT,
+
+    -- A label the person typed, such as "Visa ending 1234". Keeply never stores
+    -- a card number, and nothing in the import pipeline writes to this column.
+    payment_method_label TEXT,
+    notes                TEXT,
+    serial_number        TEXT,
+    product_photo_id     TEXT    REFERENCES document(id) ON DELETE SET NULL,
+    is_archived          INTEGER NOT NULL DEFAULT 0,
+    is_demo              INTEGER NOT NULL DEFAULT 0,
+    created_at           INTEGER NOT NULL,
+    updated_at           INTEGER NOT NULL
+);
+
+CREATE INDEX purchase_return_deadline ON purchase(return_deadline) WHERE return_deadline IS NOT NULL;
+CREATE INDEX purchase_warranty_end ON purchase(warranty_end) WHERE warranty_end IS NOT NULL;
+CREATE INDEX purchase_purchase_date ON purchase(purchase_date);
+CREATE INDEX purchase_merchant ON purchase(merchant_id);
+CREATE INDEX purchase_category ON purchase(category_id);
+CREATE INDEX purchase_archived ON purchase(is_archived);
+
+CREATE TABLE purchase_tag (
+    purchase_id TEXT NOT NULL REFERENCES purchase(id) ON DELETE CASCADE,
+    tag         TEXT NOT NULL,
+    PRIMARY KEY (purchase_id, tag)
+);
+
+CREATE INDEX purchase_tag_tag ON purchase_tag(tag);
+
+-- Manuals, warranty documents and extra photos attached to a purchase.
+CREATE TABLE purchase_document (
+    purchase_id TEXT NOT NULL REFERENCES purchase(id) ON DELETE CASCADE,
+    document_id TEXT NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    role        TEXT NOT NULL,
+    PRIMARY KEY (purchase_id, document_id, role)
+);
+
+CREATE TABLE line_item (
+    id               TEXT    NOT NULL PRIMARY KEY,
+    purchase_id      TEXT    NOT NULL REFERENCES purchase(id) ON DELETE CASCADE,
+    position         INTEGER NOT NULL,
+    description      TEXT    NOT NULL,
+    quantity         INTEGER,
+    unit_price_minor INTEGER,
+    total_price_minor INTEGER,
+    confidence       TEXT    NOT NULL
+);
+
+CREATE INDEX line_item_purchase ON line_item(purchase_id);
+
+selectById:
+SELECT * FROM purchase WHERE id = ?;
+
+selectAll:
+SELECT * FROM purchase WHERE is_archived = 0 ORDER BY purchase_date DESC, created_at DESC;
+
+selectRecent:
+SELECT * FROM purchase WHERE is_archived = 0 ORDER BY created_at DESC LIMIT ?;
+
+selectByIds:
+SELECT * FROM purchase WHERE id IN ?;
+
+selectFingerprints:
+SELECT p.id, p.merchant_name, p.purchase_date, p.price_minor, p.price_currency, p.receipt_number, d.sha256
+FROM purchase p LEFT JOIN document d ON d.id = p.receipt_document_id;
+
+selectReturnsClosingBy:
+SELECT * FROM purchase
+WHERE is_archived = 0 AND return_deadline >= ? AND return_deadline <= ?
+ORDER BY return_deadline;
+
+selectWarrantiesEndingBy:
+SELECT * FROM purchase
+WHERE is_archived = 0 AND warranty_end >= ? AND warranty_end <= ?
+ORDER BY warranty_end;
+
+upsert:
+INSERT INTO purchase(
+    id, product_name, merchant_id, merchant_name, purchase_date, price_minor, price_currency,
+    tax_minor, category_id, receipt_document_id, receipt_number,
+    return_policy_kind, return_policy_days, return_policy_until, return_source, return_deadline,
+    warranty_term_kind, warranty_term_value, warranty_term_until, warranty_provenance,
+    warranty_start, warranty_end, warranty_notes,
+    payment_method_label, notes, serial_number, product_photo_id, is_archived, is_demo,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    product_name = excluded.product_name,
+    merchant_id = excluded.merchant_id,
+    merchant_name = excluded.merchant_name,
+    purchase_date = excluded.purchase_date,
+    price_minor = excluded.price_minor,
+    price_currency = excluded.price_currency,
+    tax_minor = excluded.tax_minor,
+    category_id = excluded.category_id,
+    receipt_document_id = excluded.receipt_document_id,
+    receipt_number = excluded.receipt_number,
+    return_policy_kind = excluded.return_policy_kind,
+    return_policy_days = excluded.return_policy_days,
+    return_policy_until = excluded.return_policy_until,
+    return_source = excluded.return_source,
+    return_deadline = excluded.return_deadline,
+    warranty_term_kind = excluded.warranty_term_kind,
+    warranty_term_value = excluded.warranty_term_value,
+    warranty_term_until = excluded.warranty_term_until,
+    warranty_provenance = excluded.warranty_provenance,
+    warranty_start = excluded.warranty_start,
+    warranty_end = excluded.warranty_end,
+    warranty_notes = excluded.warranty_notes,
+    payment_method_label = excluded.payment_method_label,
+    notes = excluded.notes,
+    serial_number = excluded.serial_number,
+    product_photo_id = excluded.product_photo_id,
+    is_archived = excluded.is_archived,
+    is_demo = excluded.is_demo,
+    updated_at = excluded.updated_at;
+
+setArchived:
+UPDATE purchase SET is_archived = ?, updated_at = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM purchase WHERE id = ?;
+
+deleteDemoData:
+DELETE FROM purchase WHERE is_demo = 1;
+
+countAll:
+SELECT count(*) FROM purchase;
+
+countPurchasedBetween:
+SELECT count(*) FROM purchase WHERE is_archived = 0 AND purchase_date >= ? AND purchase_date <= ?;
+
+topMerchants:
+SELECT merchant_name, count(*) AS purchase_count
+FROM purchase
+WHERE is_archived = 0 AND merchant_name IS NOT NULL
+GROUP BY merchant_name ORDER BY purchase_count DESC, merchant_name LIMIT ?;
+
+countByCategory:
+SELECT category_id, count(*) AS purchase_count
+FROM purchase WHERE is_archived = 0 GROUP BY category_id ORDER BY purchase_count DESC;
+
+-- Tags
+
+tagsFor:
+SELECT tag FROM purchase_tag WHERE purchase_id = ? ORDER BY tag;
+
+allTags:
+SELECT DISTINCT tag FROM purchase_tag ORDER BY tag;
+
+-- Loaded in one query for list views, so showing a hundred purchases does not
+-- become a hundred round trips.
+tagsForPurchases:
+SELECT purchase_id, tag FROM purchase_tag WHERE purchase_id IN ? ORDER BY purchase_id, tag;
+
+insertTag:
+INSERT OR IGNORE INTO purchase_tag(purchase_id, tag) VALUES (?, ?);
+
+deleteTags:
+DELETE FROM purchase_tag WHERE purchase_id = ?;
+
+-- Attached documents
+
+documentsFor:
+SELECT document_id, role FROM purchase_document WHERE purchase_id = ?;
+
+insertDocument:
+INSERT OR IGNORE INTO purchase_document(purchase_id, document_id, role) VALUES (?, ?, ?);
+
+deleteDocuments:
+DELETE FROM purchase_document WHERE purchase_id = ?;
+
+deleteDocumentLink:
+DELETE FROM purchase_document WHERE purchase_id = ? AND document_id = ? AND role = ?;
+
+-- Line items
+
+lineItemsFor:
+SELECT * FROM line_item WHERE purchase_id = ? ORDER BY position;
+
+insertLineItem:
+INSERT INTO line_item(id, purchase_id, position, description, quantity, unit_price_minor, total_price_minor, confidence)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteLineItems:
+DELETE FROM line_item WHERE purchase_id = ?;

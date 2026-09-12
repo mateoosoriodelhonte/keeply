@@ -1,0 +1,50 @@
+-- A shop the person buys from. Merchants exist so someone can save their own
+-- default return window once instead of retyping it for every purchase.
+
+CREATE TABLE merchant (
+    id                  TEXT    NOT NULL PRIMARY KEY,
+    name                TEXT    NOT NULL,
+    match_key           TEXT    NOT NULL,
+    -- Newline-separated alternative spellings seen on receipts.
+    aliases             TEXT    NOT NULL DEFAULT '',
+    -- The person's own default: 'DAYS', 'UNTIL' or NULL for none saved.
+    return_policy_kind  TEXT,
+    return_policy_days  INTEGER,
+    return_policy_until TEXT,
+    notes               TEXT,
+    created_at          INTEGER NOT NULL,
+    updated_at          INTEGER NOT NULL
+);
+
+CREATE INDEX merchant_match_key ON merchant(match_key);
+CREATE UNIQUE INDEX merchant_name_unique ON merchant(name COLLATE NOCASE);
+
+selectAll:
+SELECT * FROM merchant ORDER BY name COLLATE NOCASE;
+
+selectById:
+SELECT * FROM merchant WHERE id = ?;
+
+selectByMatchKey:
+SELECT * FROM merchant WHERE match_key = ?;
+
+upsert:
+INSERT INTO merchant(
+    id, name, match_key, aliases, return_policy_kind, return_policy_days,
+    return_policy_until, notes, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    match_key = excluded.match_key,
+    aliases = excluded.aliases,
+    return_policy_kind = excluded.return_policy_kind,
+    return_policy_days = excluded.return_policy_days,
+    return_policy_until = excluded.return_policy_until,
+    notes = excluded.notes,
+    updated_at = excluded.updated_at;
+
+deleteById:
+DELETE FROM merchant WHERE id = ?;
+
+countAll:
+SELECT count(*) FROM merchant;
