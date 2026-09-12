@@ -91,6 +91,9 @@ public object ReceiptTextRenderer {
             appendLine(leftRight("Sales Tax (${taxRateLabel(spec)})", amount(spec.taxMinor, spec), width))
         }
         appendLine(leftRight("Amount Due", amount(spec.totalMinor, spec), width))
+        if (spec.taxIncludedInPrices) {
+            appendLine(leftRight("Includes tax ${taxRateLabel(spec)}", amount(spec.taxMinor, spec), width))
+        }
         appendLine()
         appendLine("Paid by ${spec.paymentLabel}")
         spec.returnPolicyLine?.let { appendLine(it) }
@@ -139,6 +142,9 @@ public object ReceiptTextRenderer {
             appendLine(leftRight("Tax ${taxRateLabel(spec)}", amount(spec.taxMinor, spec), width))
         }
         appendLine(leftRight("Total", amount(spec.totalMinor, spec), width))
+        if (spec.taxIncludedInPrices) {
+            appendLine(leftRight("Includes tax ${taxRateLabel(spec)}", amount(spec.taxMinor, spec), width))
+        }
         spec.returnPolicyLine?.let {
             appendLine()
             appendLine(it)

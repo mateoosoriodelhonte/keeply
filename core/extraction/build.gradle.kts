@@ -8,4 +8,6 @@ dependencies {
     api(project(":core:domain"))
     implementation(libs.coroutines.core)
     implementation(libs.slf4j.api)
+
+    testImplementation(project(":fixtures"))
 }
