@@ -46,7 +46,9 @@ compose.desktop {
             macOS {
                 bundleID = "app.keeply.desktop"
                 dockName = "Keeply"
-                iconFile.set(project.file("src/main/resources/icons/keeply.icns"))
+                // Set only when present so packaging works before the artwork lands.
+                val icon = project.file("src/main/resources/icons/keeply.icns")
+                if (icon.exists()) iconFile.set(icon)
                 infoPlist {
                     extraKeysRawXml =
                         """
