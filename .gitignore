@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!buildSrc/src/**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.fleet/
+
+# macOS
+.DS_Store
+
+# Keeply local artifacts (never commit user data)
+keeply-data/
+*.keeplybackup
+/local/
+/out/
+
+# Downloaded OCR language data (fetched + checksum-verified at build time)
+/third_party/tessdata/*.traineddata
+
+# Logs & temp
+*.log
+*.tmp
+hs_err_pid*
+replay_pid*
