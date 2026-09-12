@@ -29,6 +29,9 @@ kotlin {
         jvmTarget.set(JvmTarget.JVM_21)
         // Keeply favours explicit, reviewable code over clever code.
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xjdk-release=21")
+        // CI builds with -Pkeeply.strict=true, so a warning fails the build there
+        // while staying a warning during day-to-day development.
+        allWarningsAsErrors.set(providers.gradleProperty("keeply.strict").map { it.toBoolean() }.orElse(false))
     }
     explicitApi()
 }
