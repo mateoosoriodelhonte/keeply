@@ -1,0 +1,33 @@
+-- Full-text search. A standalone FTS5 table rather than an external-content one,
+-- because what a person searches spans several tables: the purchase itself, its
+-- tags, and the text Keeply read off the receipt.
+--
+-- Rows are maintained explicitly when a purchase is written, so the index can
+-- always be rebuilt from the source tables if it is ever lost.
+
+CREATE VIRTUAL TABLE purchase_fts USING fts5(
+    purchase_id UNINDEXED,
+    product_name,
+    merchant_name,
+    notes,
+    tags,
+    serial_number,
+    receipt_text,
+    tokenize = 'unicode61 remove_diacritics 2'
+);
+
+search:
+SELECT purchase_id FROM purchase_fts WHERE purchase_fts MATCH ? ORDER BY rank;
+
+insert:
+INSERT INTO purchase_fts(purchase_id, product_name, merchant_name, notes, tags, serial_number, receipt_text)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteFor:
+DELETE FROM purchase_fts WHERE purchase_id = ?;
+
+deleteAll:
+DELETE FROM purchase_fts;
+
+countAll:
+SELECT count(*) FROM purchase_fts;
