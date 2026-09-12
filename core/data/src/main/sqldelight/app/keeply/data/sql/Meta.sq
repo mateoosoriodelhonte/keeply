@@ -1,0 +1,18 @@
+-- Keeply keeps a small amount of information about the store itself. It is read
+-- when opening a database and written into backup archives so an import can tell
+-- whether it understands the data it has been handed.
+
+CREATE TABLE meta (
+    key   TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+get:
+SELECT value FROM meta WHERE key = ?;
+
+put:
+INSERT INTO meta(key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+all:
+SELECT key, value FROM meta ORDER BY key;

@@ -12,3 +12,27 @@ tasks.register("keeplyVersion") {
     val v = version.toString()
     doLast { println(v) }
 }
+
+// --- Privacy guard -----------------------------------------------------------
+//
+// Keeply promises that receipts never leave the machine. This makes that promise
+// checkable: the build fails if anything outside the optional local-AI module
+// gains network access or an analytics dependency. See PRIVACY.md.
+
+val privacyGuard = tasks.register<app.keeply.buildlogic.PrivacyGuardTask>("privacyGuard") {
+    group = "verification"
+    description = "Fails if Keeply gains network or analytics access outside :core:ai."
+    sources.from(
+        fileTree("core") { include("**/src/main/kotlin/**/*.kt") },
+        fileTree("desktop") { include("**/src/main/kotlin/**/*.kt") },
+        fileTree("fixtures") { include("**/src/main/kotlin/**/*.kt") },
+    )
+    // The Ollama integration is opt-in, off by default, and talks only to localhost.
+    allowedPaths.set(setOf("core/ai/src/"))
+}
+
+tasks.register("keeplyVerify") {
+    group = "verification"
+    description = "Everything CI runs: formatting, privacy guard, build and tests."
+    dependsOn(privacyGuard, subprojects.map { "${it.path}:build" }, "spotlessCheck")
+}
