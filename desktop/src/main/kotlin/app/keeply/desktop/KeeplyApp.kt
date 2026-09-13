@@ -56,6 +56,7 @@ import app.keeply.desktop.screens.ViewerScreen
 import app.keeply.desktop.state.KeeplyState
 import app.keeply.desktop.state.Screen
 import app.keeply.desktop.theme.Spacing
+import app.keeply.services.StorageReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,11 +70,18 @@ import java.nio.file.Path
  * like a large one.
  */
 @Composable
-public fun KeeplyApp(state: KeeplyState, modifier: Modifier = Modifier) {
+public fun KeeplyApp(
+    state: KeeplyState,
+    modifier: Modifier = Modifier,
+    /** Whether this desktop can show notifications at all. Settings needs the truth. */
+    notificationsAvailable: Boolean = false,
+) {
     val searchFocus = remember { FocusRequester() }
-    var storageReport by remember { mutableStateOf(state.keeply.storage.report()) }
+    // Measuring storage walks the data folder, so it happens off the drawing
+    // thread and only when the storage screen is actually open.
+    var storageReport by remember { mutableStateOf(StorageReport(emptyList(), 0)) }
 
-    LaunchedEffect(state.screen) {
+    LaunchedEffect(state.screen, state.purchases.size) {
         if (state.screen is Screen.Storage) {
             storageReport = withContext(Dispatchers.IO) { state.keeply.storage.report() }
         }
@@ -125,7 +133,7 @@ public fun KeeplyApp(state: KeeplyState, modifier: Modifier = Modifier) {
             Column(Modifier.fillMaxSize()) {
                 Banners(state)
                 Box(Modifier.fillMaxSize().widthIn(max = Spacing.maxContentWidth)) {
-                    Content(state, storageReport, searchFocus)
+                    Content(state, storageReport, notificationsAvailable, searchFocus)
                 }
             }
         }
@@ -222,13 +230,21 @@ private fun Banners(state: KeeplyState) {
     }
 }
 
+/** One purchase and its documents, loaded together. */
+private data class LoadedPurchase(
+    val purchase: app.keeply.domain.Purchase,
+    val receipt: app.keeply.domain.StoredDocument?,
+    val receiptText: app.keeply.domain.DocumentText?,
+    val manuals: List<app.keeply.domain.StoredDocument>,
+)
+
 @Composable
-private fun Content(state: KeeplyState, storageReport: app.keeply.services.StorageReport, searchFocus: FocusRequester) {
+private fun Content(state: KeeplyState, storageReport: StorageReport, notificationsAvailable: Boolean, searchFocus: FocusRequester) {
     val keeply = state.keeply
     when (val screen = state.screen) {
         Screen.Home -> HomeScreen(
             needsAttention = state.needsAttention,
-            recent = keeply.library.recent(),
+            recent = state.recent,
             insights = state.insights,
             today = state.todayIs(),
             onOpen = { state.go(Screen.Detail(it.id)) },
@@ -251,18 +267,33 @@ private fun Content(state: KeeplyState, storageReport: app.keeply.services.Stora
         )
 
         is Screen.Detail -> {
-            val purchase = keeply.store.purchases.get(screen.id)
-            if (purchase == null) {
-                state.go(Screen.Library)
+            // Loaded once per purchase rather than on every recomposition, and the
+            // documents with it: a detail view is five queries, not five per frame.
+            val loaded = remember(screen.id, state.purchases) {
+                keeply.store.purchases.get(screen.id)?.let { purchase ->
+                    val receipt = purchase.receiptDocumentId?.let { keeply.store.documents.get(it) }
+                    LoadedPurchase(
+                        purchase = purchase,
+                        receipt = receipt,
+                        receiptText = receipt?.let { keeply.store.documents.text(it.id) },
+                        manuals = keeply.store.purchases.attachments(purchase.id)[AttachmentRole.MANUAL]
+                            .orEmpty()
+                            .mapNotNull { keeply.store.documents.get(it) },
+                    )
+                }
+            }
+
+            if (loaded == null) {
+                // Navigating is a side effect, so it happens after composition
+                // rather than during it.
+                LaunchedEffect(screen.id) { state.go(Screen.Library) }
             } else {
-                val receipt = purchase.receiptDocumentId?.let { keeply.store.documents.get(it) }
+                val purchase = loaded.purchase
                 DetailScreen(
                     purchase = purchase,
-                    receipt = receipt,
-                    receiptText = receipt?.let { keeply.store.documents.text(it.id) },
-                    manuals = keeply.store.purchases.attachments(purchase.id)[AttachmentRole.MANUAL]
-                        .orEmpty()
-                        .mapNotNull { keeply.store.documents.get(it) },
+                    receipt = loaded.receipt,
+                    receiptText = loaded.receiptText,
+                    manuals = loaded.manuals,
                     directory = keeply.directory,
                     today = state.todayIs(),
                     onOpenDocument = { state.go(Screen.Viewer(it.id, screen)) },
@@ -312,10 +343,10 @@ private fun Content(state: KeeplyState, storageReport: app.keeply.services.Stora
 
         Screen.Settings -> SettingsScreen(
             reminders = state.reminderPreferences,
-            notificationsAvailable = true,
+            notificationsAvailable = notificationsAvailable,
             reducedMotion = state.reducedMotion,
             textScale = state.textScale,
-            demoInstalled = keeply.demo.isInstalled(),
+            demoInstalled = state.demoInstalled,
             onReminders = { state.reminderPreferences = it },
             onReducedMotion = { state.reducedMotion = it },
             onTextScale = state::scaleTextTo,
@@ -326,7 +357,7 @@ private fun Content(state: KeeplyState, storageReport: app.keeply.services.Stora
             onCancelRestore = state::cancelRestore,
             onExportCsv = { exportText(state, "keeply-purchases.csv") { keeply.backups.exportCsv() } },
             onExportJson = { exportText(state, "keeply-purchases.json") { keeply.backups.exportJson() } },
-            onDemo = { if (keeply.demo.isInstalled()) state.clearDemo() else state.installDemo() },
+            onDemo = { if (state.demoInstalled) state.clearDemo() else state.installDemo() },
         )
     }
 }

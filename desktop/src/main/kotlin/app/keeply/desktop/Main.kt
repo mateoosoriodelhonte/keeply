@@ -150,6 +150,7 @@ private fun KeeplyWindow() {
 
         is Startup.Open -> {
             val state = remember(current.keeply) { KeeplyState(current.keeply, scope) }
+            val notifier = remember { DesktopNotifier() }
 
             DisposableEffect(current.keeply) {
                 state.start()
@@ -181,7 +182,7 @@ private fun KeeplyWindow() {
                 textScale = state.textScale,
             ) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    KeeplyApp(state)
+                    KeeplyApp(state, notificationsAvailable = notifier.isAvailable)
                 }
             }
         }
