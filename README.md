@@ -174,6 +174,25 @@ method and what preprocessing measurably does and does not help.
 
 ---
 
+## Is it fast?
+
+On a library of 2,000 purchases, which is more than someone saving a receipt a
+day for five years would have:
+
+| | |
+| --- | --- |
+| opening Keeply | 4 ms |
+| searching | 5 ms |
+| filtering | 19 ms |
+| importing a photographed receipt, including reading it | 288 ms |
+
+Measured by
+[`PerformanceTest`](core/services/src/test/kotlin/app/keeply/services/PerformanceTest.kt),
+on an Apple silicon machine. Reading a receipt happens in the background: the
+window stays usable, shows what it is doing, and can be stopped.
+
+---
+
 ## Built with
 
 | | |

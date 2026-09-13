@@ -120,8 +120,11 @@ keeps every SQL statement static and parameterised, and it puts the rules about
 return and warranty status next to the types they are about instead of
 duplicating them across generated queries.
 
-If Keeply ever held a hundred thousand purchases this would be the first thing to
-change.
+Measured on a library of 2,000 purchases, which is more than somebody saving a
+receipt a day for five years would have: full-text search takes **5 ms** and a
+status filter, which loads the candidates and filters them in Kotlin, takes
+**19 ms**. If Keeply ever held a hundred thousand purchases this would be the
+first thing to change. At the size it is built for, it is not close to mattering.
 
 ### There is no server
 
@@ -129,6 +132,31 @@ Ktor is a dependency of exactly one module, and only as a client, talking to
 `127.0.0.1` when somebody has chosen to run Ollama. Keeply has no local HTTP
 boundary because it does not need one: a service boundary between an application
 and its own database earns nothing and costs a serialisation format.
+
+## What it costs to use
+
+Measured by [`PerformanceTest`](core/services/src/test/kotlin/app/keeply/services/PerformanceTest.kt)
+on an Apple silicon machine, against a library of 2,000 purchases.
+
+| | |
+| --- | --- |
+| opening the library | 4 ms |
+| full-text search | 5 ms |
+| filtering by return status | 19 ms |
+| the home screen's query | 2 ms |
+| listing fifty purchases | 1 ms |
+| the summary counts | 7 ms |
+| a thumbnail | 1 ms |
+| importing a photographed receipt, including OCR | 288 ms |
+
+Opening is measured after the first launch, which is when the language model is
+unpacked. OCR loads its model once per launch rather than once per receipt, and
+runs on a bounded pool of two engines so twenty receipts dropped at once cannot
+take the machine over. Nothing in the interface waits on any of it.
+
+The assertions in that test are generous ceilings rather than targets: it exists
+to catch a regression that makes the application feel slow, not to fail because a
+CI runner was busy.
 
 ## Building on other platforms
 

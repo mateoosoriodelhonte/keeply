@@ -60,6 +60,10 @@ public class KeeplyState(
         private set
     public var needsAttention: List<Purchase> by mutableStateOf(emptyList())
         private set
+    public var recent: List<Purchase> by mutableStateOf(emptyList())
+        private set
+    public var demoInstalled: Boolean by mutableStateOf(false)
+        private set
     public var insights: Insights? by mutableStateOf(null)
         private set
     public var searchText: String by mutableStateOf("")
@@ -141,10 +145,19 @@ public class KeeplyState(
         refreshLibrary()
     }
 
+    /**
+     * Reloads everything the screens read.
+     *
+     * Screens read these properties rather than calling the services themselves,
+     * because a composable that queries the database runs that query on every
+     * recomposition, and drawing a list should not cost a round trip per frame.
+     */
     public fun refresh() {
         refreshLibrary()
         needsAttention = keeply.library.needsAttention()
+        recent = keeply.library.recent()
         insights = keeply.insights.summarise()
+        demoInstalled = keeply.demo.isInstalled()
     }
 
     private fun refreshLibrary() {
