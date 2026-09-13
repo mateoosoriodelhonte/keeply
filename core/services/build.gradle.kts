@@ -14,8 +14,8 @@ dependencies {
     api(project(":core:backup"))
     api(project(":core:reminders"))
     api(project(":core:ai"))
+    // Demo mode generates its receipts with the same generator the tests use.
+    api(project(":fixtures"))
     implementation(libs.coroutines.core)
     implementation(libs.slf4j.api)
-
-    testImplementation(project(":fixtures"))
 }
