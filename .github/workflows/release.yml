@@ -20,10 +20,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macos-latest is Apple silicon; macos-13 is the last Intel runner.
           - runner: macos-latest
             arch: apple-silicon
-          - runner: macos-13
+          # macos-13 was the Intel runner and no longer picks jobs up: a release
+          # build sat queued on it indefinitely rather than failing. macos-15-intel
+          # is its replacement.
+          - runner: macos-15-intel
             arch: intel
     steps:
       - uses: actions/checkout@v7
