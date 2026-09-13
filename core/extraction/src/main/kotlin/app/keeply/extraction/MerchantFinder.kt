@@ -86,17 +86,50 @@ public class MerchantFinder {
         if (ADDRESS.containsMatchIn(line)) return false
         if (PHONE.containsMatchIn(line)) return false
         if (line.contains('@') && line.contains('.')) return false
+        if (!readsLikeWords(line)) return false
         return true
     }
 
-    /** Till headers shout; the library does not have to. */
+    /**
+     * Rejects lines that are OCR noise rather than a name.
+     *
+     * Cropping a photographed receipt can leave a sliver of the desk at the edge,
+     * and Tesseract reads that as something like "I OO EE EEE EE EE EE EEE ee".
+     * Without this, that becomes the shop name, which was exactly what happened
+     * the first time the pipeline ran end to end.
+     *
+     * Real names are mostly made of words of three letters or more, and use more
+     * than a couple of distinct letters.
+     */
+    private fun readsLikeWords(line: String): Boolean {
+        val tokens = line.split(' ').filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return false
+
+        val meaningful = tokens.filter { it.length >= MIN_WORD_LENGTH }.sumOf { it.length }
+        val total = tokens.sumOf { it.length }
+        if (total == 0 || meaningful.toDouble() / total < MIN_WORD_SHARE) return false
+
+        val distinctLetters = line.filter(Char::isLetter).lowercase().toSet().size
+        return distinctLetters >= MIN_DISTINCT_LETTERS
+    }
+
+    /**
+     * Till headers shout; the library does not have to.
+     *
+     * Only purely alphabetic words are re-cased. Anything carrying a digit or a
+     * symbol is left exactly as printed, because that is where the names a person
+     * would recognise on sight tend to live.
+     */
     private fun tidy(name: String): String {
-        val cleaned = name.trim().trim('*', '-', '=', '.').trim()
+        // OCR picks up stray marks at the edge of a cropped photograph, which arrive
+        // as a lone pipe or dash on the end of an otherwise perfect line.
+        val cleaned = name.replace(WHITESPACE_RUN, " ").trim().trim(*NOISE_CHARACTERS).trim()
         if (cleaned.any { it.isLowerCase() }) return cleaned
         return cleaned.split(' ').joinToString(" ") { word ->
-            when {
-                word.length <= SHORT_WORD && word.all(Char::isLetter) -> word
-                else -> word.lowercase().replaceFirstChar(Char::uppercaseChar)
+            if (word.all(Char::isLetter) && word.isNotEmpty()) {
+                word.lowercase().replaceFirstChar(Char::uppercaseChar)
+            } else {
+                word
             }
         }
     }
@@ -110,7 +143,12 @@ public class MerchantFinder {
         const val MIN_LETTERS = 3
         const val MIN_LETTER_SHARE = 0.5
         const val MIN_SUBSTRING = 4
-        const val SHORT_WORD = 3
+        const val MIN_WORD_LENGTH = 3
+        const val MIN_WORD_SHARE = 0.5
+        const val MIN_DISTINCT_LETTERS = 3
+
+        val WHITESPACE_RUN = Regex("""\s+""")
+        val NOISE_CHARACTERS = charArrayOf('*', '-', '=', '.', '|', '_', '/', '\\', ':', ',', ';')
 
         /** A street line: a number followed by words, or a postal code shape. */
         val ADDRESS = Regex(
