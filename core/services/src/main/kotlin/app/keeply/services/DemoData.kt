@@ -72,9 +72,17 @@ public class DemoData(
                     categoryId = CategoryId(demo.categoryId),
                     receiptNumber = demo.receipt.receiptNumber,
                     returnPolicy = demo.returnPolicy,
-                    returnPolicySource = ReturnPolicySource.PRINTED_ON_RECEIPT,
+                    // Only a receipt that actually prints a returns line may claim
+                    // one. The demo library holds Keeply to the same rule as a real
+                    // import, because a screenshot that overstates provenance is
+                    // still a claim about what the product does.
+                    returnPolicySource = if (demo.receipt.returnPolicyLine != null) {
+                        ReturnPolicySource.PRINTED_ON_RECEIPT
+                    } else {
+                        ReturnPolicySource.USER_ENTERED
+                    },
                     warrantyTerm = demo.warranty,
-                    warrantyProvenance = WarrantyProvenance.DOCUMENTED,
+                    warrantyProvenance = WarrantyProvenance.USER_ENTERED,
                     notes = demo.notes,
                     tags = demo.tags,
                     serialNumber = demo.serialNumber,
