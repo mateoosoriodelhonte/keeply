@@ -18,8 +18,6 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
-    implementation(compose.materialIconsExtended)
-    implementation(compose.components.resources)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.swing)
     implementation(libs.slf4j.api)
@@ -93,6 +91,22 @@ tasks.register<JavaExec>("writeScreenshots") {
             .asFile.absolutePath,
         layout.buildDirectory
             .dir("screenshot-library")
+            .get()
+            .asFile.absolutePath,
+    )
+}
+
+// Draws the application icon at every size macOS asks for. Run this, then
+// `iconutil -c icns` to produce the .icns the packager embeds; both steps are in
+// docs/LOCAL_DEVELOPMENT.md.
+tasks.register<JavaExec>("writeIconset") {
+    group = "keeply"
+    description = "Renders the Keeply application icon into build/Keeply.iconset."
+    mainClass.set("app.keeply.desktop.tools.IconArtworkKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    args(
+        layout.buildDirectory
+            .dir("Keeply.iconset")
             .get()
             .asFile.absolutePath,
     )
