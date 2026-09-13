@@ -25,12 +25,19 @@ dependencies {
     implementation(libs.slf4j.api)
     runtimeOnly(libs.logback.classic)
 
-    testImplementation("org.jetbrains.compose.ui:ui-test-junit4:${libs.versions.compose.get()}")
+    // ui-test rather than ui-test-junit4: runComposeUiTest works with any test
+    // framework, so the interface tests run on the same JUnit Platform as the rest.
+    testImplementation("org.jetbrains.compose.ui:ui-test:${libs.versions.compose.get()}")
+    testImplementation(compose.desktop.currentOs)
 }
 
 compose.desktop {
     application {
         mainClass = "app.keeply.desktop.MainKt"
+
+        // Development convenience: ./gradlew :desktop:run -Pkeeply.dataDir=/tmp/keeply-dev
+        // runs against a throwaway library instead of the real one.
+        providers.gradleProperty("keeply.dataDir").orNull?.let { jvmArgs += "-Dkeeply.dataDir=$it" }
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
@@ -70,4 +77,23 @@ compose.desktop {
             }
         }
     }
+}
+
+// Renders the documentation screenshots from the real composables against demo
+// data, so they cannot drift from the application. Needs no display.
+tasks.register<JavaExec>("writeScreenshots") {
+    group = "keeply"
+    description = "Renders Keeply's screens to PNG files in build/screenshots."
+    mainClass.set("app.keeply.desktop.tools.ScreenshotsKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    args(
+        layout.buildDirectory
+            .dir("screenshots")
+            .get()
+            .asFile.absolutePath,
+        layout.buildDirectory
+            .dir("screenshot-library")
+            .get()
+            .asFile.absolutePath,
+    )
 }
