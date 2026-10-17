@@ -1,8 +1,8 @@
 # Keeply dependency catalogue.
 # Every entry here is free and open source. Keeply has no paid dependencies.
 [versions]
-kotlin = "2.4.20"
-compose = "1.12.0"
+kotlin = "2.4.21"
+compose = "1.12.1"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 sqldelight = "2.3.2"
